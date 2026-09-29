@@ -9,7 +9,7 @@ export default function Sair() {
       className="btn ghost sm"
       type="button"
       onClick={async () => {
-        await createClient().auth.signOut();
+        await createClient().auth.signOut({ scope: "local" }); // só este aparelho; o celular continua logado
         router.replace("/login");
         router.refresh();
       }}

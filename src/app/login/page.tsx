@@ -1,10 +1,16 @@
+import { redirect } from "next/navigation";
 import LoginForm from "./LoginForm";
 import { destino } from "@/lib/destino";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Entrar · Caderno de Questões" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; erro?: string }> }) {
   const sp = await searchParams;
+  const next = destino(sp.next);
+  // Sessão confirmada no servidor: já está logado, segue direto.
+  const { data: { user } } = await (await createClient()).auth.getUser();
+  if (user) redirect(next);
   return (
     <main className="auth">
       <div className="stack" style={{ justifyItems: "center", textAlign: "center" }}>
@@ -14,7 +20,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <h1>Caderno de Questões</h1>
         <p className="muted">Entre para ver seus cadernos e suas notas.</p>
       </div>
-      <LoginForm next={destino(sp.next)} linkInvalido={sp.erro === "link"} />
+      <LoginForm next={next} linkInvalido={sp.erro === "link"} />
     </main>
   );
 }
