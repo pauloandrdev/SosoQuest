@@ -9,7 +9,8 @@ function traduz(msg: string) {
   if (/invalid login credentials/i.test(msg)) return "E-mail ou senha incorretos.";
   if (/email not confirmed/i.test(msg)) return "Confirme seu e-mail pelo link que enviamos antes de entrar.";
   if (/already registered|already exists/i.test(msg)) return "Já existe uma conta com esse e-mail. Use Entrar.";
-  if (/password should be at least/i.test(msg)) return "A senha precisa ter pelo menos 6 caracteres.";
+  if (/password should be at least/i.test(msg)) return "A senha precisa ter pelo menos 8 caracteres.";
+  if (/should contain at least one character|weak.?password/i.test(msg)) return "A senha precisa ter letras maiúsculas, minúsculas e números.";
   if (/signups not allowed|signup is disabled/i.test(msg)) return "O cadastro está fechado. Peça ao tutor para criar sua conta.";
   if (/rate limit/i.test(msg)) return "Muitas tentativas seguidas. Espere um pouco e tente de novo.";
   return msg;
@@ -91,7 +92,7 @@ export default function LoginForm({ next = "/", linkInvalido = false }: { next?:
       {modo !== "recuperar" && (
         <label className="field">
           <span>Senha</span>
-          <input className="inp" id="senha" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required minLength={6}
+          <input className="inp" id="senha" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required minLength={modo === "criar" ? 8 : 6}
             autoComplete={modo === "entrar" ? "current-password" : "new-password"} />
         </label>
       )}
@@ -103,7 +104,7 @@ export default function LoginForm({ next = "/", linkInvalido = false }: { next?:
       </button>
       {modo === "entrar" && <button className="btn ghost" type="button" onClick={() => trocar("recuperar")}>Esqueci minha senha</button>}
       {modo === "recuperar" && <button className="btn ghost" type="button" onClick={() => trocar("entrar")}>← Voltar para entrar</button>}
-      {modo === "criar" && <p className="small muted">Toda conta nova começa como aluno. Depois de entrar, use o código de convite do seu tutor.</p>}
+      {modo === "criar" && <p className="small muted">A senha precisa ter pelo menos 8 caracteres, com letra maiúscula, minúscula e número. Toda conta nova começa como aluno; depois de entrar, use o código de convite do seu tutor.</p>}
     </form>
   );
 }
