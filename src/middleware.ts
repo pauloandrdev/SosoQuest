@@ -37,12 +37,9 @@ export async function middleware(request: NextRequest) {
     url.search = path === "/" ? "" : `?next=${encodeURIComponent(path + request.nextUrl.search)}`;
     return NextResponse.redirect(url);
   }
-  if (user && path === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
+  // Quem já está logado e abre /login é mandado para dentro pela própria página de login,
+  // que confere a sessão no servidor (getUser). Fazer isso aqui, só com o token (getClaims),
+  // criava um loop quando a sessão tinha sido encerrada mas o token ainda não tinha expirado.
   return response;
 }
 
