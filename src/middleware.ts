@@ -22,9 +22,10 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims valida o token localmente (chaves assimétricas) em vez de consultar o Auth a cada página.
+  // As páginas continuam confirmando o usuário com getUser() em sessao().
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const path = request.nextUrl.pathname;
   const publica = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/api/manter-ativo");

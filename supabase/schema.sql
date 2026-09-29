@@ -15,12 +15,20 @@ create table if not exists public.profiles (
 alter table public.profiles add column if not exists tutor_id uuid references public.profiles on delete set null;
 create index if not exists profiles_tutor_idx on public.profiles (tutor_id);
 
+-- Nome com tamanho limitado (o próprio usuário pode editar o nome pela API).
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_nome_tamanho') then
+    update public.profiles set nome = left(nome, 80) where char_length(nome) > 80;
+    alter table public.profiles add constraint profiles_nome_tamanho check (char_length(nome) <= 80);
+  end if;
+end $$;
+
 -- Cria o perfil automaticamente no cadastro (sempre como aluno).
 create or replace function public.criar_perfil()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
   insert into public.profiles (id, nome)
-  values (new.id, coalesce(new.raw_user_meta_data ->> 'nome', split_part(new.email, '@', 1)));
+  values (new.id, left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'nome'), ''), split_part(new.email, '@', 1)), 80));
   return new;
 end;
 $$;
@@ -191,6 +199,13 @@ declare
 begin
   if auth.uid() is null then raise exception 'Faça login para entregar.'; end if;
   if p_modo not in ('estudo', 'simulado') then raise exception 'Modo inválido.'; end if;
+  -- Limites contra abuso: tamanho da prova e entregas seguidas.
+  if cardinality(p_itens) > 1000 or pg_column_size(p_respostas) > 200000 then
+    raise exception 'Prova grande demais.';
+  end if;
+  if (select count(*) from public.tentativas where user_id = auth.uid() and feita_em > now() - interval '1 minute') >= 10 then
+    raise exception 'Muitas entregas seguidas. Espere um minuto e tente de novo.';
+  end if;
   v_itens := public.itens_visiveis(p_caderno);
   if v_itens is null then raise exception 'Caderno não encontrado.'; end if;
   if p_respostas is null or jsonb_typeof(p_respostas) <> 'object' then p_respostas := '{}'::jsonb; end if;
@@ -236,19 +251,31 @@ $$;
 -- ---------- Convite: o aluno entra na turma do tutor com um código ----------
 alter table public.profiles add column if not exists codigo_convite text unique;
 
+-- Códigos errados digitados, para travar quem tenta adivinhar. Só as funções mexem aqui.
+create table if not exists public.convite_erros (
+  user_id uuid not null references auth.users on delete cascade,
+  em timestamptz not null default now()
+);
+create index if not exists convite_erros_idx on public.convite_erros (user_id, em);
+alter table public.convite_erros enable row level security;
+revoke all on public.convite_erros from anon, authenticated;
+
 -- Código do tutor logado. Cria na primeira vez; p_novo = true troca por outro (o antigo para de valer).
 create or replace function public.meu_codigo_convite(p_novo boolean default false)
 returns text language plpgsql security definer set search_path = public as $$
 declare
   v text;
+  b bytea;
 begin
   if not public.is_tutor() then raise exception 'Só tutores têm código de convite.'; end if;
   select codigo_convite into v from public.profiles where id = auth.uid();
   if v is null or p_novo then
     loop
+      -- gen_random_uuid() usa o gerador criptográfico do Postgres (random() é previsível).
+      b := decode(replace(gen_random_uuid()::text, '-', ''), 'hex');
       v := '';
-      for i in 1..6 loop
-        v := v || substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 1 + floor(random() * 32)::int, 1);
+      for i in 0..5 loop
+        v := v || substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 1 + get_byte(b, i) % 32, 1);
       end loop;
       exit when not exists (select 1 from public.profiles where codigo_convite = v);
     end loop;
@@ -258,7 +285,8 @@ begin
 end;
 $$;
 
--- Vincula quem está logado ao tutor dono do código. Devolve o nome do tutor.
+-- Vincula quem está logado ao tutor dono do código. Devolve o nome do tutor,
+-- ou null se o código estiver errado (sem exceção, para o erro ficar registrado).
 create or replace function public.vincular_tutor(p_codigo text)
 returns text language plpgsql security definer set search_path = public as $$
 declare
@@ -267,11 +295,18 @@ declare
 begin
   if auth.uid() is null then raise exception 'Faça login para usar o código.'; end if;
   if public.is_tutor() then raise exception 'Tutores não se vinculam a outro tutor.'; end if;
+  delete from public.convite_erros where user_id = auth.uid() and em < now() - interval '1 day';
+  if (select count(*) from public.convite_erros where user_id = auth.uid() and em > now() - interval '1 hour') >= 10 then
+    raise exception 'Muitos códigos errados. Espere uma hora e tente de novo.';
+  end if;
   select id, nome into v_tutor, v_nome from public.profiles
-  where codigo_convite = upper(trim(p_codigo)) and papel = 'tutor';
-  if v_tutor is null then raise exception 'Código inválido. Confira com o seu tutor.'; end if;
+  where codigo_convite = upper(trim(left(p_codigo, 20))) and papel = 'tutor';
+  if v_tutor is null then
+    insert into public.convite_erros (user_id) values (auth.uid());
+    return null;
+  end if;
   update public.profiles set tutor_id = v_tutor where id = auth.uid();
-  return v_nome;
+  return coalesce(nullif(v_nome, ''), 'seu tutor');
 end;
 $$;
 

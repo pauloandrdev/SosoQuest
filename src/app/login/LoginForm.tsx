@@ -2,8 +2,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/Turnstile";
 
 function traduz(msg: string) {
+  if (/captcha/i.test(msg)) return "Não conseguimos confirmar que você não é um robô. Marque a verificação e tente de novo.";
   if (/invalid login credentials/i.test(msg)) return "E-mail ou senha incorretos.";
   if (/email not confirmed/i.test(msg)) return "Confirme seu e-mail pelo link que enviamos antes de entrar.";
   if (/already registered|already exists/i.test(msg)) return "Já existe uma conta com esse e-mail. Use Entrar.";
@@ -22,29 +24,34 @@ export default function LoginForm({ next = "/", linkInvalido = false }: { next?:
   const [erro, setErro] = useState(linkInvalido ? "O link do e-mail expirou ou já foi usado. Peça um novo." : "");
   const [ok, setOk] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  const [captcha, setCaptcha] = useState("");
+  const [renovar, setRenovar] = useState(0);
+  const falta = !!TURNSTILE_SITE_KEY && !captcha;
 
   const callback = (destino: string) => `${window.location.origin}/auth/callback?next=${encodeURIComponent(destino)}`;
   const trocar = (m: typeof modo) => { setModo(m); setErro(""); setOk(""); };
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
+    if (falta) { setErro("Marque a verificação \"não sou um robô\"."); return; }
     setErro(""); setOk(""); setOcupado(true);
     const supabase = createClient();
+    const captchaToken = captcha || undefined;
     try {
       if (modo === "entrar") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+        const { error } = await supabase.auth.signInWithPassword({ email, password: senha, options: { captchaToken } });
         if (error) throw error;
         router.replace(next);
         router.refresh();
       } else if (modo === "recuperar") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: callback("/nova-senha") });
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: callback("/nova-senha"), captchaToken });
         if (error) throw error;
         setOk("Se existir uma conta com esse e-mail, enviamos um link para criar uma nova senha.");
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
           password: senha,
-          options: { data: { nome: nome.trim() }, emailRedirectTo: callback(next) },
+          options: { data: { nome: nome.trim() }, emailRedirectTo: callback(next), captchaToken },
         });
         if (error) throw error;
         if (data.session) { router.replace(next); router.refresh(); }
@@ -54,6 +61,7 @@ export default function LoginForm({ next = "/", linkInvalido = false }: { next?:
       setErro(traduz(err instanceof Error ? err.message : String(err)));
     } finally {
       setOcupado(false);
+      setRenovar((n) => n + 1); // o token do CAPTCHA só vale uma vez
     }
   }
 
@@ -87,9 +95,10 @@ export default function LoginForm({ next = "/", linkInvalido = false }: { next?:
             autoComplete={modo === "entrar" ? "current-password" : "new-password"} />
         </label>
       )}
+      <Turnstile onToken={setCaptcha} renovar={renovar} />
       {erro && <p className="err" role="alert">{erro}</p>}
       {ok && <p className="okmsg" role="status">{ok}</p>}
-      <button className="btn primary" type="submit" disabled={ocupado}>
+      <button className="btn primary" type="submit" disabled={ocupado || falta}>
         {ocupado ? "Aguarde…" : { entrar: "Entrar", criar: "Criar conta", recuperar: "Enviar link" }[modo]}
       </button>
       {modo === "entrar" && <button className="btn ghost" type="button" onClick={() => trocar("recuperar")}>Esqueci minha senha</button>}
