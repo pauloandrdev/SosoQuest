@@ -1,0 +1,21 @@
+{
+  "titulo": "Exemplo — Direito do Trabalho",
+  "descricao": "Mostra os três tipos de item e um enunciado compartilhado",
+  "contextos": {
+    "4": "Beta, empregada da Distribuidora Sol Ltda. desde 03.03.2019, trabalha de segunda a sexta-feira das 13:00 às 22:00, com 1 hora de intervalo, e aos sábados das 08:00 às 12:00, sem intervalo. No período aquisitivo 2022/2023, faltou injustificadamente 16 dias."
+  },
+  "itens": [
+    { "id": "1.1", "grupo": "1", "tipo": "ce", "texto": "A duração do trabalho normal não pode ultrapassar 8 horas diárias e 44 horas semanais.", "resposta": "C" },
+    { "id": "1.2", "grupo": "1", "tipo": "ce", "texto": "O adicional de periculosidade é de 30% sobre o salário.", "resposta": "C" },
+    {
+      "id": "2", "grupo": "2", "tipo": "mc",
+      "texto": "Durante o período aquisitivo, Marta faltou injustificadamente 10 dias ao serviço. De acordo com o art. 130 da CLT, a duração das férias de Marta será de:",
+      "opcoes": { "A": "30 dias.", "B": "24 dias.", "C": "18 dias.", "D": "12 dias." },
+      "resposta": "B"
+    },
+    { "id": "3", "grupo": "3", "tipo": "discursiva", "texto": "Até quando deve ser efetuado o pagamento da remuneração das férias?", "resposta_texto": "Até 2 dias antes do início do período de gozo (art. 145 da CLT)." },
+    { "id": "4.1", "grupo": "4", "ctx": "4", "tipo": "ce", "texto": "É necessária a concessão de intervalo intrajornada aos sábados.", "resposta": "E" },
+    { "id": "4.2", "grupo": "4", "ctx": "4", "tipo": "ce", "texto": "Beta faz jus ao adicional noturno.", "resposta": "C" },
+    { "id": "4.3", "grupo": "4", "ctx": "4", "tipo": "discursiva", "texto": "Qual a duração da jornada semanal de Beta?", "resposta_texto": "44 horas: 8 horas diárias de segunda a sexta (40h) mais 4 horas no sábado." }
+  ]
+}
