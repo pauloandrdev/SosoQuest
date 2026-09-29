@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Header from "@/components/Header";
+import Vincular from "@/components/Vincular";
 import { sessao } from "@/lib/auth";
 import { pct, fmtData, plural } from "@/lib/tempo";
 
@@ -53,8 +54,9 @@ export default async function Dashboard() {
                   ? "Crie o primeiro caderno enviando um arquivo JSON ou montando as questões na tela."
                   : perfil.tutorId
                     ? "Quando o seu tutor publicar um caderno, ele aparece aqui."
-                    : "Você ainda não está vinculado a um tutor. Peça ao administrador para fazer o vínculo."}
+                    : "Você ainda não está em nenhuma turma. Peça ao seu tutor o código de convite e digite abaixo."}
               </p>
+              {perfil.papel === "aluno" && !perfil.tutorId && <Vincular />}
               {perfil.papel === "tutor" && <Link className="btn primary" href="/tutor/novo">Criar caderno</Link>}
             </div>
           ) : (

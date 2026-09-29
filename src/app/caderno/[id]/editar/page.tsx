@@ -10,9 +10,12 @@ export const dynamic = "force-dynamic";
 export default async function EditarPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, perfil } = await sessaoTutor();
-  const { data: c } = await supabase.from("cadernos").select("id, titulo, descricao, contextos, itens").eq("id", id).maybeSingle();
-  if (!c) notFound();
-  const inicial: CadernoDados = { titulo: c.titulo, descricao: c.descricao ?? "", contextos: (c.contextos ?? {}) as Record<string, string>, itens: c.itens as Item[] };
+  const [{ data: c }, { data: itens }] = await Promise.all([
+    supabase.from("cadernos").select("id, titulo, descricao, contextos").eq("id", id).maybeSingle(),
+    supabase.rpc("caderno_completo", { p_caderno: id }), // com gabarito; só volta para quem criou
+  ]);
+  if (!c || !itens) notFound();
+  const inicial: CadernoDados = { titulo: c.titulo, descricao: c.descricao ?? "", contextos: (c.contextos ?? {}) as Record<string, string>, itens: itens as Item[] };
   return (
     <>
       <Header perfil={perfil} />

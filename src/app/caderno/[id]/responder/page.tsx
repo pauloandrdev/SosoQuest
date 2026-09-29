@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { sessao } from "@/lib/auth";
-import type { Item } from "@/lib/caderno";
+import type { ItemAberto } from "@/lib/caderno";
 import Runner from "./Runner";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +16,12 @@ export default async function ResponderPage({
   const { id } = await params;
   const sp = await searchParams;
   const { supabase } = await sessao();
-  const { data: c } = await supabase.from("cadernos").select("id, titulo, contextos, itens").eq("id", id).maybeSingle();
+  const [{ data: c }, { data: itensData }] = await Promise.all([
+    supabase.from("cadernos").select("id, titulo, contextos").eq("id", id).maybeSingle(),
+    supabase.rpc("itens_para_responder", { p_caderno: id }), // sem gabarito
+  ]);
   if (!c) notFound();
-  const itens = c.itens as Item[];
+  const itens = (itensData ?? []) as ItemAberto[];
   const modo = sp.modo === "simulado" ? "simulado" : "estudo";
 
   let ids = itens.map((q) => q.id);

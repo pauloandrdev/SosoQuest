@@ -77,6 +77,8 @@ create table if not exists public.tentativas (
   segundos int not null,
   feita_em timestamptz not null default now()
 );
+-- Resultado por item, calculado no banco: {"4.1": "ok" | "bad" | "blank" | "void"}.
+alter table public.tentativas add column if not exists resultado jsonb not null default '{}'::jsonb;
 create index if not exists tentativas_user_idx on public.tentativas (user_id, feita_em desc);
 create index if not exists tentativas_caderno_idx on public.tentativas (caderno_id, feita_em desc);
 
@@ -115,12 +117,178 @@ create policy cadernos_apagar on public.cadernos for delete to authenticated
 drop policy if exists tentativas_ler on public.tentativas;
 create policy tentativas_ler on public.tentativas for select to authenticated
   using (user_id = auth.uid() or public.eh_meu_aluno(user_id));
+-- Ninguém grava tentativa direto: só pela função entregar(), que corrige no banco.
 drop policy if exists tentativas_criar on public.tentativas;
-create policy tentativas_criar on public.tentativas for insert to authenticated
-  with check (user_id = auth.uid());
+revoke insert, update on public.tentativas from authenticated, anon;
 drop policy if exists tentativas_apagar on public.tentativas;
 create policy tentativas_apagar on public.tentativas for delete to authenticated
   using (public.eh_meu_aluno(user_id));
+
+-- ---------- Gabarito protegido ----------
+-- A coluna itens tem as respostas certas, então o app não a lê diretamente.
+-- Quem responde recebe os itens sem gabarito (itens_para_responder); a resposta
+-- de um item só sai quando o aluno confere (conferir_item) ou entrega (entregar).
+revoke select on public.cadernos from authenticated, anon;
+grant select (id, titulo, descricao, contextos, total_itens, criado_por, criado_em, atualizado_em)
+  on public.cadernos to authenticated;
+
+-- Itens do caderno, se quem está logado pode vê-lo (autor ou aluno do autor).
+create or replace function public.itens_visiveis(p_caderno uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select itens from public.cadernos
+  where id = p_caderno and (criado_por = auth.uid() or criado_por = public.meu_tutor());
+$$;
+
+-- Mesma regra do app (temGabarito): discursiva sempre; objetiva se a resposta é uma das opções.
+create or replace function public.item_tem_gabarito(q jsonb)
+returns boolean language sql immutable as $$
+  select q ->> 'tipo' = 'open' or (
+    coalesce(q ->> 'resposta', 'X') <> 'X'
+    and exists (
+      select 1 from jsonb_array_elements(case when jsonb_typeof(q -> 'opcoes') = 'array' then q -> 'opcoes' else '[]'::jsonb end) o
+      where o ->> 'key' = q ->> 'resposta'
+    )
+  );
+$$;
+
+-- Itens sem as respostas, com um campo "gabarito" dizendo se o item conta na nota.
+create or replace function public.itens_para_responder(p_caderno uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg((q - 'resposta' - 'resposta_texto') || jsonb_build_object('gabarito', public.item_tem_gabarito(q)) order by n), '[]'::jsonb)
+  from jsonb_array_elements(coalesce(public.itens_visiveis(p_caderno), '[]'::jsonb)) with ordinality as e(q, n);
+$$;
+
+-- Gabarito de um item (modo estudo e "ver resposta" das discursivas).
+create or replace function public.conferir_item(p_caderno uuid, p_item text)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('resposta', q -> 'resposta', 'resposta_texto', q -> 'resposta_texto')
+  from jsonb_array_elements(coalesce(public.itens_visiveis(p_caderno), '[]'::jsonb)) q
+  where q ->> 'id' = p_item
+  limit 1;
+$$;
+
+-- Caderno completo, com gabarito: só para o tutor que o criou (tela de edição).
+create or replace function public.caderno_completo(p_caderno uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select itens from public.cadernos where id = p_caderno and criado_por = auth.uid();
+$$;
+
+-- Corrige e grava uma tentativa. Devolve o id e o gabarito dos itens respondidos.
+create or replace function public.entregar(p_caderno uuid, p_modo text, p_itens text[], p_respostas jsonb, p_segundos int)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_itens jsonb;
+  v_item text;
+  q jsonb;
+  r text;
+  v_status text;
+  v_usados text[] := '{}';
+  v_respostas jsonb := '{}'::jsonb;
+  v_resultado jsonb := '{}'::jsonb;
+  v_gabarito jsonb := '[]'::jsonb;
+  n_ac int := 0; n_er int := 0; n_br int := 0; n_sg int := 0;
+  v_id uuid;
+begin
+  if auth.uid() is null then raise exception 'Faça login para entregar.'; end if;
+  if p_modo not in ('estudo', 'simulado') then raise exception 'Modo inválido.'; end if;
+  v_itens := public.itens_visiveis(p_caderno);
+  if v_itens is null then raise exception 'Caderno não encontrado.'; end if;
+  if p_respostas is null or jsonb_typeof(p_respostas) <> 'object' then p_respostas := '{}'::jsonb; end if;
+
+  foreach v_item in array coalesce(p_itens, '{}') loop
+    continue when v_item = any(v_usados);
+    q := (select x from jsonb_array_elements(v_itens) x where x ->> 'id' = v_item limit 1);
+    continue when q is null;
+    v_usados := v_usados || v_item;
+
+    r := p_respostas ->> v_item;
+    if q ->> 'tipo' = 'open' then
+      if r is distinct from '=ok' and r is distinct from '=bad' then r := null; end if;
+    elsif r is not null and not exists (
+      select 1 from jsonb_array_elements(case when jsonb_typeof(q -> 'opcoes') = 'array' then q -> 'opcoes' else '[]'::jsonb end) o
+      where o ->> 'key' = r
+    ) then
+      r := null;
+    end if;
+
+    if not public.item_tem_gabarito(q) then v_status := 'void'; n_sg := n_sg + 1;
+    elsif r is null then v_status := 'blank'; n_br := n_br + 1;
+    elsif (q ->> 'tipo' = 'open' and r = '=ok') or r = q ->> 'resposta' then v_status := 'ok'; n_ac := n_ac + 1;
+    else v_status := 'bad'; n_er := n_er + 1;
+    end if;
+
+    if r is not null then v_respostas := v_respostas || jsonb_build_object(v_item, r); end if;
+    v_resultado := v_resultado || jsonb_build_object(v_item, v_status);
+    v_gabarito := v_gabarito || jsonb_build_array(jsonb_build_object('id', v_item, 'resposta', q -> 'resposta', 'resposta_texto', q -> 'resposta_texto'));
+  end loop;
+
+  if cardinality(v_usados) = 0 then raise exception 'Nenhum item válido para entregar.'; end if;
+
+  insert into public.tentativas (caderno_id, user_id, modo, itens, respostas, acertos, erros, brancos, sem_gabarito, total, segundos, resultado)
+  values (p_caderno, auth.uid(), p_modo, to_jsonb(v_usados), v_respostas, n_ac, n_er, n_br, n_sg, cardinality(v_usados),
+          greatest(0, least(coalesce(p_segundos, 0), 86400)), v_resultado)
+  returning id into v_id;
+
+  return jsonb_build_object('id', v_id, 'gabarito', v_gabarito);
+end;
+$$;
+
+-- ---------- Convite: o aluno entra na turma do tutor com um código ----------
+alter table public.profiles add column if not exists codigo_convite text unique;
+
+-- Código do tutor logado. Cria na primeira vez; p_novo = true troca por outro (o antigo para de valer).
+create or replace function public.meu_codigo_convite(p_novo boolean default false)
+returns text language plpgsql security definer set search_path = public as $$
+declare
+  v text;
+begin
+  if not public.is_tutor() then raise exception 'Só tutores têm código de convite.'; end if;
+  select codigo_convite into v from public.profiles where id = auth.uid();
+  if v is null or p_novo then
+    loop
+      v := '';
+      for i in 1..6 loop
+        v := v || substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 1 + floor(random() * 32)::int, 1);
+      end loop;
+      exit when not exists (select 1 from public.profiles where codigo_convite = v);
+    end loop;
+    update public.profiles set codigo_convite = v where id = auth.uid();
+  end if;
+  return v;
+end;
+$$;
+
+-- Vincula quem está logado ao tutor dono do código. Devolve o nome do tutor.
+create or replace function public.vincular_tutor(p_codigo text)
+returns text language plpgsql security definer set search_path = public as $$
+declare
+  v_tutor uuid;
+  v_nome text;
+begin
+  if auth.uid() is null then raise exception 'Faça login para usar o código.'; end if;
+  if public.is_tutor() then raise exception 'Tutores não se vinculam a outro tutor.'; end if;
+  select id, nome into v_tutor, v_nome from public.profiles
+  where codigo_convite = upper(trim(p_codigo)) and papel = 'tutor';
+  if v_tutor is null then raise exception 'Código inválido. Confira com o seu tutor.'; end if;
+  update public.profiles set tutor_id = v_tutor where id = auth.uid();
+  return v_nome;
+end;
+$$;
+
+revoke execute on function public.meu_codigo_convite(boolean) from public, anon;
+revoke execute on function public.vincular_tutor(text) from public, anon;
+grant execute on function public.meu_codigo_convite(boolean) to authenticated;
+grant execute on function public.vincular_tutor(text) to authenticated;
+
+revoke execute on function public.itens_visiveis(uuid) from public, anon, authenticated;
+revoke execute on function public.entregar(uuid, text, text[], jsonb, int) from public, anon;
+revoke execute on function public.itens_para_responder(uuid) from public, anon;
+revoke execute on function public.conferir_item(uuid, text) from public, anon;
+revoke execute on function public.caderno_completo(uuid) from public, anon;
+grant execute on function public.entregar(uuid, text, text[], jsonb, int) to authenticated;
+grant execute on function public.itens_para_responder(uuid) to authenticated;
+grant execute on function public.conferir_item(uuid, text) to authenticated;
+grant execute on function public.caderno_completo(uuid) to authenticated;
 
 -- =====================================================================
 -- Depois de criar a SUA conta pelo site, rode isto trocando o e-mail
@@ -129,7 +297,8 @@ create policy tentativas_apagar on public.tentativas for delete to authenticated
 --   update public.profiles set papel = 'tutor'
 --   where id = (select id from auth.users where email = 'seu@email.com');
 --
--- E para vincular um aluno a um tutor:
+-- O aluno se vincula ao tutor pelo código de convite (tela Desempenho do tutor).
+-- Se preferir fazer à mão:
 --
 --   update public.profiles
 --   set tutor_id = (select id from auth.users where email = 'tutor@email.com')

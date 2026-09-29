@@ -1,8 +1,10 @@
 import LoginForm from "./LoginForm";
+import { destino } from "@/lib/destino";
 
 export const metadata = { title: "Entrar · Caderno de Questões" };
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; erro?: string }> }) {
+  const sp = await searchParams;
   return (
     <main className="auth">
       <div className="stack" style={{ justifyItems: "center", textAlign: "center" }}>
@@ -12,7 +14,7 @@ export default function LoginPage() {
         <h1>Caderno de Questões</h1>
         <p className="muted">Entre para ver seus cadernos e suas notas.</p>
       </div>
-      <LoginForm />
+      <LoginForm next={destino(sp.next)} linkInvalido={sp.erro === "link"} />
     </main>
   );
 }
