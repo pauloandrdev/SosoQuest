@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import { sessaoTutor } from "@/lib/auth";
 import { fmtData, pct } from "@/lib/tempo";
+import Convite from "./Convite";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Desempenho · Caderno de Questões" };
@@ -9,10 +10,11 @@ type T = { caderno_id: string; user_id: string; acertos: number; total: number; 
 
 export default async function DesempenhoPage() {
   const { supabase, perfil } = await sessaoTutor();
-  const [{ data: perfis }, { data: cadernos }, { data: tent }] = await Promise.all([
-    supabase.from("profiles").select("id, nome, papel").order("nome"),
+  const [{ data: perfis }, { data: cadernos }, { data: tent }, { data: codigo }] = await Promise.all([
+    supabase.from("profiles").select("id, nome, papel").eq("tutor_id", perfil.id).order("nome"),
     supabase.from("cadernos").select("id, titulo").order("criado_em", { ascending: false }),
     supabase.from("tentativas").select("caderno_id, user_id, acertos, total, sem_gabarito, feita_em").order("feita_em", { ascending: false }).limit(5000),
+    supabase.rpc("meu_codigo_convite"),
   ]);
   const ts = (tent ?? []) as T[];
   const alunos = (perfis ?? []).filter((p) => p.papel === "aluno");
@@ -35,10 +37,11 @@ export default async function DesempenhoPage() {
       <Header perfil={perfil} atual="desempenho" />
       <main className="wrap stack-lg">
         <h1>Desempenho dos alunos</h1>
+        {typeof codigo === "string" && <Convite codigo={codigo} />}
         {!alunos.length ? (
           <div className="empty">
-            <h3>Nenhum aluno cadastrado</h3>
-            <p className="muted">Quando alguém criar uma conta, aparece aqui como aluno.</p>
+            <h3>Nenhum aluno na turma</h3>
+            <p className="muted">Quando um aluno entrar com o seu código de convite, ele aparece aqui.</p>
           </div>
         ) : (
           <>

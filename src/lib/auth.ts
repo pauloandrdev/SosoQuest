@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 export type Papel = "aluno" | "tutor";
-export type Perfil = { id: string; nome: string; papel: Papel; email: string };
+export type Perfil = { id: string; nome: string; papel: Papel; email: string; tutorId: string | null };
 
 /** Usuário logado + perfil. Redireciona para /login se não houver sessão. */
 export async function sessao() {
@@ -11,12 +11,13 @@ export async function sessao() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const { data } = await supabase.from("profiles").select("id, nome, papel").eq("id", user.id).maybeSingle();
+  const { data } = await supabase.from("profiles").select("id, nome, papel, tutor_id").eq("id", user.id).maybeSingle();
   const perfil: Perfil = {
     id: user.id,
     nome: data?.nome || user.email?.split("@")[0] || "Você",
     papel: data?.papel === "tutor" ? "tutor" : "aluno",
     email: user.email ?? "",
+    tutorId: data?.tutor_id ?? null,
   };
   return { supabase, perfil };
 }

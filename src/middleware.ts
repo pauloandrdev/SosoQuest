@@ -27,12 +27,13 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const publica = path.startsWith("/login") || path.startsWith("/auth");
+  const publica = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/api/manter-ativo");
 
   if (!user && !publica) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.search = "";
+    // Guarda para onde a pessoa ia (ex.: link de convite) para voltar depois do login.
+    url.search = path === "/" ? "" : `?next=${encodeURIComponent(path + request.nextUrl.search)}`;
     return NextResponse.redirect(url);
   }
   if (user && path === "/login") {

@@ -9,16 +9,17 @@ import type { CadernoRun } from "./Runner";
 
 type Filtro = "erradas" | "branco" | "todas";
 
-export default function Resultado({ caderno, lista, respostas, textos, modo, segundos, salvo }: {
+export default function Resultado({ caderno, lista, respostas, textos, modo, segundos }: {
   caderno: CadernoRun; lista: Item[]; respostas: Record<string, string>; textos: Record<string, string>;
-  modo: "estudo" | "simulado"; segundos: number; salvo: "salvando" | "ok" | "erro";
+  modo: "estudo" | "simulado"; segundos: number;
 }) {
   const router = useRouter();
   const p = corrigir(lista, respostas);
   const g = p.total - p.sem_gabarito;
   const w = (n: number) => (g ? `${(n / g) * 100}%` : "0");
   const [filtro, setFiltro] = useState<Filtro>(p.erros + p.brancos ? "erradas" : "todas");
-  const ordenada = [...lista].sort((a, b) => caderno.itens.indexOf(a) - caderno.itens.indexOf(b));
+  const indice = new Map(caderno.itens.map((q, i) => [q.id, i]));
+  const ordenada = [...lista].sort((a, b) => (indice.get(a.id) ?? 0) - (indice.get(b.id) ?? 0));
   const refazer = ordenada.filter((q) => temGabarito(q) && !acertou(q, respostas[q.id])).map((q) => q.id);
   const visiveis = ordenada.filter((q) => {
     const r = respostas[q.id];
@@ -26,7 +27,6 @@ export default function Resultado({ caderno, lista, respostas, textos, modo, seg
     if (filtro === "branco") return temGabarito(q) && !r;
     return true;
   });
-  const msg = { salvando: "Salvando no seu histórico…", ok: "Resultado salvo no seu histórico.", erro: "Não foi possível salvar este resultado. Verifique a conexão." }[salvo];
 
   return (
     <div className="stack-lg">
@@ -44,7 +44,7 @@ export default function Resultado({ caderno, lista, respostas, textos, modo, seg
           {p.sem_gabarito > 0 && <div className="stat"><b>{p.sem_gabarito}</b><span className="small muted">sem gabarito</span></div>}
           <div className="stat"><b>{fmtTempo(segundos)}</b><span className="small muted">tempo</span></div>
         </div>
-        <p className={salvo === "erro" ? "err" : "small muted"}>{msg}</p>
+        <p className="small muted">Resultado salvo no seu histórico.</p>
         <div className="row">
           {refazer.length > 0 && (
             <button className="btn primary" type="button" onClick={() => router.push(`/caderno/${caderno.id}/responder?${new URLSearchParams({ modo, so: refazer.join(",") })}`)}>

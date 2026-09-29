@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "@/components/Header";
 import { sessao } from "@/lib/auth";
-import { acertou, temGabarito, type Item } from "@/lib/caderno";
+import type { ItemAberto, StatusItem } from "@/lib/caderno";
 import { pct, fmtData, fmtTempo, plural } from "@/lib/tempo";
 import StartPanel from "./StartPanel";
 import ApagarCaderno from "./ApagarCaderno";
@@ -12,14 +12,18 @@ export const dynamic = "force-dynamic";
 type Tent = {
   id: string; user_id: string; modo: string; itens: string[]; respostas: Record<string, string>;
   acertos: number; erros: number; brancos: number; sem_gabarito: number; total: number; segundos: number; feita_em: string;
+  resultado: Record<string, StatusItem> | null;
 };
 
 export default async function CadernoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, perfil } = await sessao();
-  const { data: c } = await supabase.from("cadernos").select("*").eq("id", id).maybeSingle();
+  const [{ data: c }, { data: itensData }] = await Promise.all([
+    supabase.from("cadernos").select("id, titulo, descricao").eq("id", id).maybeSingle(),
+    supabase.rpc("itens_para_responder", { p_caderno: id }), // sem gabarito
+  ]);
   if (!c) notFound();
-  const itens = c.itens as Item[];
+  const itens = (itensData ?? []) as ItemAberto[];
   const { data: tdata } = await supabase.from("tentativas").select("*").eq("caderno_id", id).order("feita_em", { ascending: false }).limit(200);
   const tentativas = (tdata ?? []) as Tent[];
   const tutor = perfil.papel === "tutor";
@@ -35,14 +39,15 @@ export default async function CadernoPage({ params }: { params: Promise<{ id: st
   const quem = (uid: string) => (uid === perfil.id ? "Você" : nomes[uid] || "Aluno");
 
   const minhas = tentativas.filter((t) => t.user_id === perfil.id);
-  const porId = new Map(itens.map((q) => [q.id, q]));
+  const existe = new Set(itens.map((q) => q.id));
   const ultima = minhas[0];
+  // Erradas e em branco da última tentativa, pelo resultado que o banco calculou.
   const erradas = ultima
-    ? (ultima.itens || []).filter((iid) => { const q = porId.get(iid); return q && temGabarito(q) && !acertou(q, ultima.respostas?.[iid]); })
+    ? (ultima.itens || []).filter((iid) => existe.has(iid) && (ultima.resultado?.[iid] === "bad" || ultima.resultado?.[iid] === "blank"))
     : [];
   const tipos = { mc: 0, ce: 0, open: 0 };
   itens.forEach((q) => tipos[q.tipo]++);
-  const semGab = itens.filter((q) => !temGabarito(q)).length;
+  const semGab = itens.filter((q) => !q.gabarito).length;
   const nota = (t: Tent) => pct(t.acertos, t.total - t.sem_gabarito);
 
   const melhores: { nome: string; p: number; t: Tent }[] = [];

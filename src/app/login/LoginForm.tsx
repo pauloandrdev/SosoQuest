@@ -13,15 +13,18 @@ function traduz(msg: string) {
   return msg;
 }
 
-export default function LoginForm() {
+export default function LoginForm({ next = "/", linkInvalido = false }: { next?: string; linkInvalido?: boolean }) {
   const router = useRouter();
-  const [modo, setModo] = useState<"entrar" | "criar">("entrar");
+  const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  const [erro, setErro] = useState("");
+  const [erro, setErro] = useState(linkInvalido ? "O link do e-mail expirou ou já foi usado. Peça um novo." : "");
   const [ok, setOk] = useState("");
   const [ocupado, setOcupado] = useState(false);
+
+  const callback = (destino: string) => `${window.location.origin}/auth/callback?next=${encodeURIComponent(destino)}`;
+  const trocar = (m: typeof modo) => { setModo(m); setErro(""); setOk(""); };
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -31,16 +34,20 @@ export default function LoginForm() {
       if (modo === "entrar") {
         const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
         if (error) throw error;
-        router.replace("/");
+        router.replace(next);
         router.refresh();
+      } else if (modo === "recuperar") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: callback("/nova-senha") });
+        if (error) throw error;
+        setOk("Se existir uma conta com esse e-mail, enviamos um link para criar uma nova senha.");
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
           password: senha,
-          options: { data: { nome: nome.trim() }, emailRedirectTo: `${window.location.origin}/auth/callback` },
+          options: { data: { nome: nome.trim() }, emailRedirectTo: callback(next) },
         });
         if (error) throw error;
-        if (data.session) { router.replace("/"); router.refresh(); }
+        if (data.session) { router.replace(next); router.refresh(); }
         else setOk("Conta criada. Abra o e-mail que enviamos e clique no link para confirmar; depois é só entrar.");
       }
     } catch (err) {
@@ -52,10 +59,17 @@ export default function LoginForm() {
 
   return (
     <form className="card" onSubmit={enviar}>
-      <div className="seg" role="group" aria-label="Entrar ou criar conta">
-        <button type="button" aria-pressed={modo === "entrar"} onClick={() => setModo("entrar")}>Entrar</button>
-        <button type="button" aria-pressed={modo === "criar"} onClick={() => setModo("criar")}>Criar conta</button>
-      </div>
+      {modo === "recuperar" ? (
+        <div className="stack" style={{ gap: 4 }}>
+          <h2>Recuperar senha</h2>
+          <p className="small muted">Informe seu e-mail. Enviaremos um link para você criar uma senha nova.</p>
+        </div>
+      ) : (
+        <div className="seg" role="group" aria-label="Entrar ou criar conta">
+          <button type="button" aria-pressed={modo === "entrar"} onClick={() => trocar("entrar")}>Entrar</button>
+          <button type="button" aria-pressed={modo === "criar"} onClick={() => trocar("criar")}>Criar conta</button>
+        </div>
+      )}
       {modo === "criar" && (
         <label className="field">
           <span>Seu nome</span>
@@ -66,17 +80,21 @@ export default function LoginForm() {
         <span>E-mail</span>
         <input className="inp" id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
       </label>
-      <label className="field">
-        <span>Senha</span>
-        <input className="inp" id="senha" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required minLength={6}
-          autoComplete={modo === "entrar" ? "current-password" : "new-password"} />
-      </label>
+      {modo !== "recuperar" && (
+        <label className="field">
+          <span>Senha</span>
+          <input className="inp" id="senha" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required minLength={6}
+            autoComplete={modo === "entrar" ? "current-password" : "new-password"} />
+        </label>
+      )}
       {erro && <p className="err" role="alert">{erro}</p>}
       {ok && <p className="okmsg" role="status">{ok}</p>}
       <button className="btn primary" type="submit" disabled={ocupado}>
-        {ocupado ? "Aguarde…" : modo === "entrar" ? "Entrar" : "Criar conta"}
+        {ocupado ? "Aguarde…" : { entrar: "Entrar", criar: "Criar conta", recuperar: "Enviar link" }[modo]}
       </button>
-      {modo === "criar" && <p className="small muted">Toda conta nova começa como aluno. O tutor é definido pelo administrador.</p>}
+      {modo === "entrar" && <button className="btn ghost" type="button" onClick={() => trocar("recuperar")}>Esqueci minha senha</button>}
+      {modo === "recuperar" && <button className="btn ghost" type="button" onClick={() => trocar("entrar")}>← Voltar para entrar</button>}
+      {modo === "criar" && <p className="small muted">Toda conta nova começa como aluno. Depois de entrar, use o código de convite do seu tutor.</p>}
     </form>
   );
 }

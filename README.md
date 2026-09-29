@@ -39,12 +39,14 @@ vercel --prod                                 # mostra a URL final, ex.: https:/
 
 Ou pelo site: suba o repositório no GitHub → vercel.com → **Add New Project** → importe o repo → adicione as duas variáveis → **Deploy**.
 
+**Manter o Supabase acordado:** o plano gratuito pausa o projeto depois de 7 dias sem acesso. O `vercel.json` já agenda um Cron diário que chama `/api/manter-ativo` para evitar isso. Opcional: crie a variável `CRON_SECRET` (qualquer texto aleatório longo) na Vercel para que só o Cron consiga chamar essa rota.
+
 ## 4. Ajustar o login no Supabase
 
 Em **Authentication → URL Configuration**:
 
 - **Site URL:** a URL da Vercel (ex.: `https://caderno-xyz.vercel.app`)
-- **Redirect URLs:** adicione `https://caderno-xyz.vercel.app/auth/callback` e `http://localhost:3000/auth/callback`
+- **Redirect URLs:** adicione `https://caderno-xyz.vercel.app/**` e `http://localhost:3000/**` (o `/**` no final libera os links de confirmação, recuperação de senha e convite)
 
 Por padrão o Supabase pede confirmação por e-mail no cadastro. O envio de e-mail embutido do plano gratuito tem limite baixo por hora; para uso pessoal você pode desligar **Confirm email** nas configurações do provedor Email em **Authentication**.
 
@@ -58,6 +60,14 @@ Toda conta nova nasce como **aluno**. Crie a sua conta pelo site e rode no **SQL
 update public.profiles set papel = 'tutor'
 where id = (select id from auth.users where email = 'seu@email.com');
 ```
+
+## 6. Convidar alunos
+
+Cada aluno vê só os cadernos do seu tutor. Na tela **Desempenho**, o tutor encontra o **código de convite** e o link (`/vincular?codigo=...`). O aluno abre o link (ou digita o código na tela inicial) e entra na turma. **Gerar outro código** invalida o antigo; quem já entrou continua na turma.
+
+## Segurança do gabarito
+
+O gabarito nunca vai inteiro para o navegador do aluno: o app recebe os itens sem as respostas, a resposta de um item só é liberada quando o aluno marca (modo Estudo) ou entrega, e a nota é calculada no banco pela função `entregar`. Por isso o aluno não consegue ver o gabarito antes nem gravar uma nota falsa. Sempre que atualizar o app, rode o `supabase/schema.sql` de novo (ele pode ser rodado várias vezes sem apagar nada).
 
 Saia e entre de novo: aparecem **Novo caderno** e **Desempenho** no menu.
 

@@ -19,6 +19,11 @@ export type CadernoDados = {
   itens: Item[];
 };
 export type Caderno = CadernoDados & { id: string; criado_em: string; atualizado_em: string };
+/** Item como chega para quem responde: sem as respostas. "gabarito" diz se o item conta na nota. */
+export type ItemAberto = Omit<Item, "resposta" | "resposta_texto"> & { gabarito: boolean };
+export type Gabarito = { resposta: string | null; resposta_texto: string | null };
+/** Resultado de cada item numa tentativa, calculado pelo banco. */
+export type StatusItem = "ok" | "bad" | "blank" | "void";
 
 export const TIPO_LABEL: Record<Tipo, string> = { mc: "Múltipla escolha", ce: "Certo/Errado", open: "Discursiva" };
 export const ALPHA = "ABCDEFGHIJ";
@@ -48,7 +53,7 @@ export function corrigir(itens: Item[], respostas: Record<string, string>): Plac
   }
   return p;
 }
-export const rotulo = (q: Item) => (q.id === q.grupo ? `Questão ${q.grupo}` : `Questão ${q.grupo} · item ${q.id}`);
+export const rotulo = (q: Pick<Item, "id" | "grupo">) => (q.id === q.grupo ? `Questão ${q.grupo}` : `Questão ${q.grupo} · item ${q.id}`);
 
 /* ---------------- importação ---------------- */
 
