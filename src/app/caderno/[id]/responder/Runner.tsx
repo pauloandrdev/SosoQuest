@@ -129,7 +129,9 @@ export default function Runner({ caderno, ordem, modo }: { caderno: CadernoRun; 
     });
     setEnviando(false);
     if (error || !data) {
-      setErroRede("Não foi possível entregar. Suas respostas continuam aqui — verifique a conexão e tente de novo.");
+      // P0001 = mensagem do próprio banco (ex.: limite de entregas); o resto é falha de rede.
+      setErroRede(error?.code === "P0001" ? `${error.message} Suas respostas continuam aqui.`
+        : "Não foi possível entregar. Suas respostas continuam aqui — verifique a conexão e tente de novo.");
       return;
     }
     const g: Record<string, Gabarito> = { ...gab };

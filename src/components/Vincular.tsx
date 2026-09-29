@@ -17,7 +17,8 @@ export default function Vincular({ codigoInicial = "", trocar = false }: { codig
     const { data, error } = await createClient().rpc("vincular_tutor", { p_codigo: codigo });
     setOcupado(false);
     if (error) { setErro(error.message || "Não foi possível usar o código."); return; }
-    setOk(`Pronto! Você agora está na turma de ${data || "seu tutor"}.`);
+    if (!data) { setErro("Código inválido. Confira com o seu tutor."); return; }
+    setOk(`Pronto! Você agora está na turma de ${data}.`);
     router.push("/");
     router.refresh();
   }

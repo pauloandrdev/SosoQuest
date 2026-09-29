@@ -67,7 +67,9 @@ Cada aluno vê só os cadernos do seu tutor. Na tela **Desempenho**, o tutor enc
 
 ## Segurança do gabarito
 
-O gabarito nunca vai inteiro para o navegador do aluno: o app recebe os itens sem as respostas, a resposta de um item só é liberada quando o aluno marca (modo Estudo) ou entrega, e a nota é calculada no banco pela função `entregar`. Por isso o aluno não consegue ver o gabarito antes nem gravar uma nota falsa. Sempre que atualizar o app, rode o `supabase/schema.sql` de novo (ele pode ser rodado várias vezes sem apagar nada).
+O gabarito nunca vai inteiro para o navegador do aluno: o app recebe os itens sem as respostas, a resposta de um item só é liberada quando o aluno marca (modo Estudo) ou entrega, e a nota é calculada no banco pela função `entregar`. Por isso o aluno não consegue ver o gabarito antes nem gravar uma nota falsa.
+
+Limites contra abuso (no banco): no máximo 10 entregas por minuto por aluno, provas de até 1000 itens, 10 códigos de convite errados por hora (depois disso, trava por uma hora) e nomes de até 80 caracteres. O app também envia cabeçalhos de segurança (CSP, bloqueio de iframe) configurados no `next.config.ts`. Sempre que atualizar o app, rode o `supabase/schema.sql` de novo (ele pode ser rodado várias vezes sem apagar nada).
 
 Saia e entre de novo: aparecem **Novo caderno** e **Desempenho** no menu.
 
