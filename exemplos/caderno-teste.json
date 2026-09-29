@@ -1,0 +1,47 @@
+{
+  "titulo": "Caderno de teste — Conhecimentos gerais",
+  "descricao": "10 itens para testar múltipla escolha, Certo/Errado, discursiva e enunciado compartilhado",
+  "contextos": {
+    "5": "Uma loja vendia uma camiseta por R$ 80,00. Na promoção de sábado, o preço teve desconto de 25%. Na segunda-feira, o preço promocional foi reajustado em 25%."
+  },
+  "itens": [
+    {
+      "id": "1", "grupo": "1", "tipo": "mc",
+      "texto": "Qual é a capital do Brasil?",
+      "opcoes": { "A": "Rio de Janeiro", "B": "São Paulo", "C": "Brasília", "D": "Salvador" },
+      "resposta": "C"
+    },
+    {
+      "id": "2", "grupo": "2", "tipo": "mc",
+      "texto": "Qual é o maior planeta do Sistema Solar?",
+      "opcoes": { "A": "Terra", "B": "Júpiter", "C": "Saturno", "D": "Netuno", "E": "Marte" },
+      "resposta": "B"
+    },
+    { "id": "3.1", "grupo": "3", "tipo": "ce", "texto": "A água ferve a 100 °C ao nível do mar.", "resposta": "C" },
+    { "id": "3.2", "grupo": "3", "tipo": "ce", "texto": "O Sol gira em torno da Terra.", "resposta": "E" },
+    { "id": "3.3", "grupo": "3", "tipo": "ce", "texto": "O Brasil é o maior país da América do Sul em área.", "resposta": "C" },
+    {
+      "id": "4", "grupo": "4", "tipo": "discursiva",
+      "texto": "Explique, em uma frase, o que é fotossíntese.",
+      "resposta_texto": "Processo em que as plantas usam a luz do sol, a água e o gás carbônico para produzir glicose (energia), liberando oxigênio."
+    },
+    {
+      "id": "5.1", "grupo": "5", "ctx": "5", "tipo": "mc",
+      "texto": "Qual foi o preço da camiseta no sábado, com o desconto?",
+      "opcoes": { "A": "R$ 55,00", "B": "R$ 60,00", "C": "R$ 64,00", "D": "R$ 70,00" },
+      "resposta": "B"
+    },
+    { "id": "5.2", "grupo": "5", "ctx": "5", "tipo": "ce", "texto": "Depois do reajuste de segunda-feira, a camiseta voltou a custar R$ 80,00.", "resposta": "E" },
+    {
+      "id": "5.3", "grupo": "5", "ctx": "5", "tipo": "discursiva",
+      "texto": "Qual o preço da camiseta na segunda-feira? Mostre a conta.",
+      "resposta_texto": "R$ 75,00. No sábado: 80 × 0,75 = 60. Na segunda: 60 × 1,25 = 75."
+    },
+    {
+      "id": "6", "grupo": "6", "tipo": "mc",
+      "texto": "Quem escreveu \"Dom Casmurro\"?",
+      "opcoes": { "A": "José de Alencar", "B": "Machado de Assis", "C": "Clarice Lispector", "D": "Carlos Drummond de Andrade" },
+      "resposta": "B"
+    }
+  ]
+}

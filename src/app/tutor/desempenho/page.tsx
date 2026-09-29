@@ -37,8 +37,8 @@ export default async function DesempenhoPage() {
         <h1>Desempenho dos alunos</h1>
         {!alunos.length ? (
           <div className="empty">
-            <h3>Nenhum aluno cadastrado</h3>
-            <p className="muted">Quando alguém criar uma conta, aparece aqui como aluno.</p>
+            <h3>Nenhum aluno vinculado</h3>
+            <p className="muted">Quando um aluno for vinculado a você, ele aparece aqui.</p>
           </div>
         ) : (
           <>

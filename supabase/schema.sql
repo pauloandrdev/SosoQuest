@@ -11,6 +11,10 @@ create table if not exists public.profiles (
   criado_em timestamptz not null default now()
 );
 
+-- Tutor ao qual o aluno está vinculado. O aluno só vê os cadernos desse tutor.
+alter table public.profiles add column if not exists tutor_id uuid references public.profiles on delete set null;
+create index if not exists profiles_tutor_idx on public.profiles (tutor_id);
+
 -- Cria o perfil automaticamente no cadastro (sempre como aluno).
 create or replace function public.criar_perfil()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -30,6 +34,18 @@ create trigger ao_criar_usuario
 create or replace function public.is_tutor()
 returns boolean language sql stable security definer set search_path = public as $$
   select coalesce((select papel = 'tutor' from public.profiles where id = auth.uid()), false);
+$$;
+
+-- Tutor de quem está logado (null se não tiver).
+create or replace function public.meu_tutor()
+returns uuid language sql stable security definer set search_path = public as $$
+  select tutor_id from public.profiles where id = auth.uid();
+$$;
+
+-- Diz se o usuário informado é aluno vinculado a quem está logado.
+create or replace function public.eh_meu_aluno(aluno uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = aluno and tutor_id = auth.uid());
 $$;
 
 -- ---------- Cadernos: itens e enunciados compartilhados em JSON ----------
@@ -69,10 +85,10 @@ alter table public.profiles enable row level security;
 alter table public.cadernos enable row level security;
 alter table public.tentativas enable row level security;
 
--- Perfis: cada um vê o seu; o tutor vê todos (para o painel de desempenho).
+-- Perfis: cada um vê o seu e o do seu tutor; o tutor vê os dos alunos vinculados.
 drop policy if exists perfis_ler on public.profiles;
 create policy perfis_ler on public.profiles for select to authenticated
-  using (id = auth.uid() or public.is_tutor());
+  using (id = auth.uid() or tutor_id = auth.uid() or id = public.meu_tutor());
 
 -- O usuário só pode mudar o próprio NOME. O papel não pode ser alterado pelo app.
 drop policy if exists perfis_editar on public.profiles;
@@ -81,26 +97,30 @@ create policy perfis_editar on public.profiles for update to authenticated
 revoke update on public.profiles from authenticated, anon;
 grant update (nome) on public.profiles to authenticated;
 
--- Cadernos: qualquer usuário logado lê; só tutor cria, edita e apaga.
+-- Cadernos: o tutor lê e mexe nos que criou; o aluno lê os do seu tutor.
 drop policy if exists cadernos_ler on public.cadernos;
-create policy cadernos_ler on public.cadernos for select to authenticated using (true);
+create policy cadernos_ler on public.cadernos for select to authenticated
+  using (criado_por = auth.uid() or criado_por = public.meu_tutor());
 drop policy if exists cadernos_criar on public.cadernos;
-create policy cadernos_criar on public.cadernos for insert to authenticated with check (public.is_tutor());
+create policy cadernos_criar on public.cadernos for insert to authenticated
+  with check (public.is_tutor() and criado_por = auth.uid());
 drop policy if exists cadernos_editar on public.cadernos;
-create policy cadernos_editar on public.cadernos for update to authenticated using (public.is_tutor()) with check (public.is_tutor());
+create policy cadernos_editar on public.cadernos for update to authenticated
+  using (public.is_tutor() and criado_por = auth.uid()) with check (public.is_tutor() and criado_por = auth.uid());
 drop policy if exists cadernos_apagar on public.cadernos;
-create policy cadernos_apagar on public.cadernos for delete to authenticated using (public.is_tutor());
+create policy cadernos_apagar on public.cadernos for delete to authenticated
+  using (public.is_tutor() and criado_por = auth.uid());
 
--- Tentativas: cada um grava e vê as próprias; o tutor vê as de todos.
+-- Tentativas: cada um grava e vê as próprias; o tutor vê as dos alunos vinculados.
 drop policy if exists tentativas_ler on public.tentativas;
 create policy tentativas_ler on public.tentativas for select to authenticated
-  using (user_id = auth.uid() or public.is_tutor());
+  using (user_id = auth.uid() or public.eh_meu_aluno(user_id));
 drop policy if exists tentativas_criar on public.tentativas;
 create policy tentativas_criar on public.tentativas for insert to authenticated
   with check (user_id = auth.uid());
 drop policy if exists tentativas_apagar on public.tentativas;
 create policy tentativas_apagar on public.tentativas for delete to authenticated
-  using (public.is_tutor());
+  using (public.eh_meu_aluno(user_id));
 
 -- =====================================================================
 -- Depois de criar a SUA conta pelo site, rode isto trocando o e-mail
@@ -108,4 +128,10 @@ create policy tentativas_apagar on public.tentativas for delete to authenticated
 --
 --   update public.profiles set papel = 'tutor'
 --   where id = (select id from auth.users where email = 'seu@email.com');
+--
+-- E para vincular um aluno a um tutor:
+--
+--   update public.profiles
+--   set tutor_id = (select id from auth.users where email = 'tutor@email.com')
+--   where id = (select id from auth.users where email = 'aluno@email.com');
 -- =====================================================================
