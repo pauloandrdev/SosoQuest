@@ -2,9 +2,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Icone from "@/components/Icone";
 import RichText from "@/components/RichText";
 import { acertou, corrigir, rotulo, temGabarito, type Item } from "@/lib/caderno";
-import { fmtTempo, pct } from "@/lib/tempo";
+import { fmtTempo, nivel, pct } from "@/lib/tempo";
 import type { CadernoRun } from "./Runner";
 
 type Filtro = "erradas" | "branco" | "todas";
@@ -17,6 +18,7 @@ export default function Resultado({ caderno, lista, respostas, textos, modo, seg
   const p = corrigir(lista, respostas);
   const g = p.total - p.sem_gabarito;
   const w = (n: number) => (g ? `${(n / g) * 100}%` : "0");
+  const nota = pct(p.acertos, g);
   const [filtro, setFiltro] = useState<Filtro>(p.erros + p.brancos ? "erradas" : "todas");
   const indice = new Map(caderno.itens.map((q, i) => [q.id, i]));
   const ordenada = [...lista].sort((a, b) => (indice.get(a.id) ?? 0) - (indice.get(b.id) ?? 0));
@@ -31,24 +33,32 @@ export default function Resultado({ caderno, lista, respostas, textos, modo, seg
   return (
     <div className="stack-lg">
       <section className="scorehead">
-        <div className="stack" style={{ gap: 6 }}><span className="label">Resultado</span><h1>{caderno.titulo}</h1></div>
-        <div className="big"><b>{p.acertos}/{g}</b><span>{pct(p.acertos, g)}% de acerto</span></div>
+        <div className="score-main">
+          <div className={"ring " + nivel(nota)} style={{ "--p": nota } as React.CSSProperties} role="img" aria-label={`${nota}% de acerto`}>
+            <div><b>{nota}%</b><span>{p.acertos} de {g}</span></div>
+          </div>
+          <div className="score-msg">
+            <span className="label">Resultado · {modo === "simulado" ? "Simulado" : "Estudo"}</span>
+            <h1>{nota >= 90 ? "Excelente!" : nota >= 70 ? "Mandou bem!" : nota >= 50 ? "Bom caminho, dá para melhorar." : "Vamos revisar juntos?"}</h1>
+            <p className="muted">{caderno.titulo}</p>
+            <p className="small muted">Resultado salvo no seu histórico.</p>
+          </div>
+        </div>
         <div className="bar" role="img" aria-label={`${p.acertos} acertos, ${p.erros} erros, ${p.brancos} em branco`}>
           <i style={{ width: w(p.acertos), background: "var(--ok)" }} />
           <i style={{ width: w(p.erros), background: "var(--bad)" }} />
         </div>
         <div className="stats">
-          <div className="stat ok"><b>{p.acertos}</b><span className="small muted">acertos</span></div>
-          <div className="stat bad"><b>{p.erros}</b><span className="small muted">erros</span></div>
-          <div className="stat"><b>{p.brancos}</b><span className="small muted">em branco</span></div>
+          <div className="stat ok"><Icone nome="certo" /><b>{p.acertos}</b><span className="small muted">acertos</span></div>
+          <div className="stat bad"><Icone nome="alvo" /><b>{p.erros}</b><span className="small muted">erros</span></div>
+          <div className="stat"><Icone nome="livro" /><b>{p.brancos}</b><span className="small muted">em branco</span></div>
           {p.sem_gabarito > 0 && <div className="stat"><b>{p.sem_gabarito}</b><span className="small muted">sem gabarito</span></div>}
-          <div className="stat"><b>{fmtTempo(segundos)}</b><span className="small muted">tempo</span></div>
+          <div className="stat"><Icone nome="relogio" /><b>{fmtTempo(segundos)}</b><span className="small muted">tempo</span></div>
         </div>
-        <p className="small muted">Resultado salvo no seu histórico.</p>
         <div className="row">
           {refazer.length > 0 && (
             <button className="btn primary" type="button" onClick={() => router.push(`/caderno/${caderno.id}/responder?${new URLSearchParams({ modo, so: refazer.join(",") })}`)}>
-              Refazer as {refazer.length} erradas e em branco
+              <Icone nome="repetir" />Refazer as {refazer.length} erradas e em branco
             </button>
           )}
           <Link className="btn" href={`/caderno/${caderno.id}`}>Voltar ao caderno</Link>

@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import { sessaoTutor } from "@/lib/auth";
-import { fmtData, pct } from "@/lib/tempo";
+import { fmtData, nivel, pct } from "@/lib/tempo";
 import Convite from "./Convite";
 
 export const dynamic = "force-dynamic";
@@ -36,49 +36,59 @@ export default async function DesempenhoPage() {
     <>
       <Header perfil={perfil} atual="desempenho" />
       <main className="wrap stack-lg">
-        <h1>Desempenho dos alunos</h1>
+        <div className="stack" style={{ gap: 6 }}>
+          <span className="label">Sua turma</span>
+          <h1>Desempenho dos alunos</h1>
+        </div>
         {typeof codigo === "string" && <Convite codigo={codigo} />}
         {!alunos.length ? (
           <div className="empty">
+            <div className="bubbles" aria-hidden="true"><i /><i /><i /><i /><i /></div>
             <h3>Nenhum aluno na turma</h3>
             <p className="muted">Quando um aluno entrar com o seu código de convite, ele aparece aqui.</p>
           </div>
         ) : (
           <>
             <section className="stack">
-              <h2>Resumo</h2>
-              <div className="tablewrap">
-                <table className="hist">
-                  <thead><tr><th>Aluno</th><th>Tentativas</th><th>Cadernos feitos</th><th>Acerto médio</th><th>Última atividade</th></tr></thead>
-                  <tbody>
-                    {linhas.map((l) => (
-                      <tr key={l.a.id}>
-                        <td className="wrapc">{l.a.nome || "Sem nome"}</td>
-                        <td className="mono">{l.n}</td>
-                        <td className="mono">{l.feitos} de {cads.length}</td>
-                        <td className="mono">{l.n ? `${l.media}%` : "—"}</td>
-                        <td>{l.ultima ? fmtData(l.ultima) : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="sec-head"><h2>Resumo</h2><span className="label">{alunos.length} {alunos.length === 1 ? "aluno" : "alunos"}</span></div>
+              <div className="tablecard">
+                <div className="tablewrap">
+                  <table className="hist">
+                    <thead><tr><th>Aluno</th><th>Tentativas</th><th>Cadernos feitos</th><th>Acerto médio</th><th>Última atividade</th></tr></thead>
+                    <tbody>
+                      {linhas.map((l) => (
+                        <tr key={l.a.id}>
+                          <td className="wrapc">{l.a.nome || "Sem nome"}</td>
+                          <td className="mono">{l.n}</td>
+                          <td className="mono">{l.feitos} de {cads.length}</td>
+                          <td>{l.n ? <span className={"pill " + nivel(l.media)}>{l.media}%</span> : <span className="muted">—</span>}</td>
+                          <td>{l.ultima ? fmtData(l.ultima) : <span className="muted">—</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </section>
             {cads.length > 0 && (
               <section className="stack">
                 <h2>Melhor nota por caderno</h2>
-                <div className="tablewrap">
-                  <table className="hist">
-                    <thead><tr><th>Caderno</th>{linhas.map((l) => <th key={l.a.id}>{l.a.nome || "Sem nome"}</th>)}</tr></thead>
-                    <tbody>
-                      {cads.map((c) => (
-                        <tr key={c.id}>
-                          <td className="wrapc">{c.titulo}</td>
-                          {linhas.map((l) => <td key={l.a.id} className="mono">{l.melhor[c.id] == null ? "—" : `${l.melhor[c.id]}%`}</td>)}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="tablecard">
+                  <div className="tablewrap">
+                    <table className="hist">
+                      <thead><tr><th>Caderno</th>{linhas.map((l) => <th key={l.a.id}>{l.a.nome || "Sem nome"}</th>)}</tr></thead>
+                      <tbody>
+                        {cads.map((c) => (
+                          <tr key={c.id}>
+                            <td className="wrapc">{c.titulo}</td>
+                            {linhas.map((l) => (
+                              <td key={l.a.id}>{l.melhor[c.id] == null ? <span className="muted">—</span> : <span className={"pill " + nivel(l.melhor[c.id]!)}>{l.melhor[c.id]}%</span>}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </section>
             )}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "@/components/Header";
 import Editor from "@/components/Editor";
+import Icone from "@/components/Icone";
 import { sessaoTutor } from "@/lib/auth";
 import type { CadernoDados, Item } from "@/lib/caderno";
 
@@ -20,7 +21,7 @@ export default async function EditarPage({ params }: { params: Promise<{ id: str
     <>
       <Header perfil={perfil} />
       <main className="wrap stack-lg" style={{ maxWidth: 900 }}>
-        <Link className="btn ghost" href={`/caderno/${id}`} style={{ justifySelf: "start" }}>← Voltar ao caderno</Link>
+        <Link className="back" href={`/caderno/${id}`}><Icone nome="voltar" tamanho={16} />Voltar ao caderno</Link>
         <h1>Editar caderno</h1>
         <p className="note warn">Mudar o número de um item faz as tentativas antigas perderem o vínculo com ele no &quot;Refazer as que errei&quot;. As notas já registradas não mudam.</p>
         <Editor inicial={inicial} cadernoId={id} />

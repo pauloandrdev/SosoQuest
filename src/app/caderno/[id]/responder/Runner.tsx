@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Icone from "@/components/Icone";
 import RichText from "@/components/RichText";
 import { createClient } from "@/lib/supabase/client";
 import { rotulo, TIPO_LABEL, type Gabarito, type Item, type ItemAberto } from "@/lib/caderno";
@@ -236,8 +237,8 @@ export default function Runner({ caderno, ordem, modo }: { caderno: CadernoRun; 
     if (travado) {
       fb = !temG ? <p className="fb neutral">Este item está sem gabarito ou foi anulado — não conta na nota.</p>
         : !g ? <p className="fb neutral">Conferindo…</p>
-        : resp === g.resposta ? <p className="fb ok">Acertou.</p>
-        : <p className="fb bad">{q.tipo === "ce" ? `Errou. O item está ${g.resposta === "C" ? "CERTO" : "ERRADO"}.` : `Errou. A resposta certa é ${g.resposta}.`}</p>;
+        : resp === g.resposta ? <p className="fb ok"><Icone nome="certo" />Acertou!</p>
+        : <p className="fb bad"><Icone nome="alvo" />{q.tipo === "ce" ? `Errou. O item está ${g.resposta === "C" ? "CERTO" : "ERRADO"}.` : `Errou. A resposta certa é ${g.resposta}.`}</p>;
     }
   }
 
@@ -253,8 +254,8 @@ export default function Runner({ caderno, ordem, modo }: { caderno: CadernoRun; 
           <h2>{caderno.titulo}</h2>
         </div>
         <div className="row">
-          <span className="mono muted" aria-label="Tempo">{fmtTempo(decorrido)}</span>
-          <Link className="btn ghost" href={`/caderno/${caderno.id}`}>Sair</Link>
+          <span className="timer" aria-label="Tempo"><Icone nome="relogio" tamanho={15} />{fmtTempo(decorrido)}</span>
+          <Link className="btn ghost" href={`/caderno/${caderno.id}`}><Icone nome="sair" tamanho={16} />Sair</Link>
         </div>
       </div>
       <div className="progress" aria-hidden="true"><i style={{ width: `${(respondidos / lista.length) * 100}%` }} /></div>

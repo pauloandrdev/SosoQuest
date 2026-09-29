@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "@/components/Header";
+import Icone from "@/components/Icone";
 import { sessao } from "@/lib/auth";
 import type { ItemAberto, StatusItem } from "@/lib/caderno";
-import { pct, fmtData, fmtTempo, plural } from "@/lib/tempo";
+import { pct, fmtData, fmtTempo, nivel } from "@/lib/tempo";
 import StartPanel from "./StartPanel";
 import ApagarCaderno from "./ApagarCaderno";
 
@@ -51,32 +52,37 @@ export default async function CadernoPage({ params }: { params: Promise<{ id: st
   const nota = (t: Tent) => pct(t.acertos, t.total - t.sem_gabarito);
 
   const melhores: { nome: string; p: number; t: Tent }[] = [];
-  for (const t of tentativas) {
+  for (const t of tutor ? tentativas : minhas) {
     const n = quem(t.user_id);
     const cur = melhores.find((m) => m.nome === n);
     if (!cur) melhores.push({ nome: n, p: nota(t), t });
     else if (nota(t) > cur.p) Object.assign(cur, { p: nota(t), t });
   }
 
-  const partes = [tipos.mc && `${tipos.mc} múltipla escolha`, tipos.ce && `${tipos.ce} certo/errado`, tipos.open && `${tipos.open} discursivas`].filter(Boolean).join(" · ");
+  const historico = tutor ? tentativas : minhas;
 
   return (
     <>
       <Header perfil={perfil} />
       <main className="wrap start">
-        <Link className="btn ghost" href="/" style={{ justifySelf: "start" }}>← Todos os cadernos</Link>
-        <div className="stack" style={{ gap: 8 }}>
+        <Link className="back" href="/"><Icone nome="voltar" tamanho={16} />Todos os cadernos</Link>
+        <div className="page-head">
           <h1>{c.titulo}</h1>
-          {c.descricao && <p>{c.descricao}</p>}
-          <p className="muted">{plural(itens.length, "item", "itens")} · {partes}</p>
-          {semGab > 0 && <p className="small muted">{plural(semGab, "item está", "itens estão")} sem gabarito e não {semGab === 1 ? "conta" : "contam"} na nota.</p>}
+          {c.descricao && <p className="muted" style={{ fontSize: "1.05rem" }}>{c.descricao}</p>}
+          <div className="chips">
+            <span className="chip"><b>{itens.length}</b> {itens.length === 1 ? "item" : "itens"}</span>
+            {tipos.mc > 0 && <span className="chip"><b>{tipos.mc}</b> múltipla escolha</span>}
+            {tipos.ce > 0 && <span className="chip"><b>{tipos.ce}</b> certo/errado</span>}
+            {tipos.open > 0 && <span className="chip"><b>{tipos.open}</b> {tipos.open === 1 ? "discursiva" : "discursivas"}</span>}
+            {semGab > 0 && <span className="chip warn"><b>{semGab}</b> sem gabarito (não {semGab === 1 ? "conta" : "contam"} na nota)</span>}
+          </div>
         </div>
 
         <StartPanel id={id} erradas={erradas} temDiscursiva={tipos.open > 0} />
 
         {tutor && (
           <div className="row">
-            <Link className="btn" href={`/caderno/${id}/editar`}>Editar caderno</Link>
+            <Link className="btn" href={`/caderno/${id}/editar`}><Icone nome="lapis" tamanho={16} />Editar caderno</Link>
             <ApagarCaderno id={id} />
           </div>
         )}
@@ -86,7 +92,7 @@ export default async function CadernoPage({ params }: { params: Promise<{ id: st
             <h2>{tutor ? "Melhores notas por aluno" : "Sua melhor nota"}</h2>
             <div className="stats">
               {melhores.map((m) => (
-                <div className="stat" key={m.nome}>
+                <div className={"stat " + nivel(m.p)} key={m.nome}>
                   <span className="label">{m.nome}</span>
                   <b>{m.p}%</b>
                   <span className="small muted">{m.t.acertos} de {m.t.total - m.t.sem_gabarito} · {fmtData(m.t.feita_em)}</span>
@@ -96,29 +102,31 @@ export default async function CadernoPage({ params }: { params: Promise<{ id: st
           </section>
         )}
 
-        {tentativas.length > 0 && (
+        {historico.length > 0 && (
           <section className="stack">
             <h2>Histórico</h2>
-            <div className="tablewrap">
-              <table className="hist">
-                <thead>
-                  <tr>{(tutor ? ["Aluno"] : []).concat(["Quando", "Modo", "Acertos", "Erros", "Branco", "Nota", "Tempo"]).map((h) => <th key={h}>{h}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {tentativas.slice(0, 50).map((t) => (
-                    <tr key={t.id}>
-                      {tutor && <td className="wrapc">{quem(t.user_id)}</td>}
-                      <td>{fmtData(t.feita_em)}</td>
-                      <td>{t.modo === "simulado" ? "Simulado" : "Estudo"}{t.total < itens.length ? " · parcial" : ""}</td>
-                      <td className="mono">{t.acertos}</td>
-                      <td className="mono">{t.erros}</td>
-                      <td className="mono">{t.brancos}</td>
-                      <td className="mono">{nota(t)}%</td>
-                      <td className="mono">{fmtTempo(t.segundos)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="tablecard">
+              <div className="tablewrap">
+                <table className="hist">
+                  <thead>
+                    <tr>{(tutor ? ["Aluno"] : []).concat(["Quando", "Modo", "Acertos", "Erros", "Branco", "Nota", "Tempo"]).map((h) => <th key={h}>{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {historico.slice(0, 50).map((t) => (
+                      <tr key={t.id}>
+                        {tutor && <td className="wrapc">{quem(t.user_id)}</td>}
+                        <td>{fmtData(t.feita_em)}</td>
+                        <td>{t.modo === "simulado" ? "Simulado" : "Estudo"}{t.total < itens.length ? " · parcial" : ""}</td>
+                        <td className="mono">{t.acertos}</td>
+                        <td className="mono">{t.erros}</td>
+                        <td className="mono">{t.brancos}</td>
+                        <td><span className={"pill " + nivel(nota(t))}>{nota(t)}%</span></td>
+                        <td className="mono">{fmtTempo(t.segundos)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
         )}

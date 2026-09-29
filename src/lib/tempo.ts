@@ -17,3 +17,6 @@ export const fmtData = (iso: string) =>
   });
 
 export const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+
+/** Classe de cor pela nota: verde a partir de 70%, amarelo a partir de 50%, vermelho abaixo. */
+export const nivel = (p: number) => (p >= 70 ? "lvl-ok" : p >= 50 ? "lvl-mid" : "lvl-low");

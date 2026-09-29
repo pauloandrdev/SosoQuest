@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Editor from "@/components/Editor";
+import Icone from "@/components/Icone";
 import { importar, type CadernoDados } from "@/lib/caderno";
 import { PROMPT_JSON } from "@/lib/prompt";
 
@@ -37,8 +38,9 @@ export default function Importar() {
       <label className={"drop" + (arrastando ? " over" : "")} htmlFor="arquivo"
         onDragOver={(e) => { e.preventDefault(); setArrastando(true); }} onDragLeave={() => setArrastando(false)}
         onDrop={(e) => { e.preventDefault(); setArrastando(false); lerArquivo(e.dataTransfer.files[0]); }}>
-        <span className="label">Arquivo JSON</span>
-        <span>Toque para escolher ou arraste o arquivo <b>.json</b> aqui</span>
+        <Icone nome="enviar" tamanho={30} />
+        <b style={{ fontSize: "1.05rem" }}>Enviar arquivo JSON</b>
+        <span className="muted">Toque para escolher ou arraste o arquivo <b>.json</b> aqui</span>
         <input id="arquivo" type="file" accept="application/json,.json" onChange={(e) => lerArquivo(e.target.files?.[0])} />
       </label>
 

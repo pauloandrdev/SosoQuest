@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Icone from "@/components/Icone";
 import { createClient } from "@/lib/supabase/client";
 
 /** Código e link de convite do tutor, com copiar e gerar outro. */
@@ -24,16 +25,24 @@ export default function Convite({ codigo }: { codigo: string }) {
   }
 
   return (
-    <section className="stack">
-      <h2>Convide seus alunos</h2>
-      <p className="muted">Mande o link (ou o código) para o aluno. Depois de criar a conta, ele entra na sua turma e passa a ver os seus cadernos.</p>
-      <div className="stats">
-        <div className="stat"><span className="label">Código</span><b className="mono" style={{ letterSpacing: "0.15em" }}>{codigo}</b></div>
+    <section className="card stack" style={{ gap: 18 }}>
+      <div className="stack" style={{ gap: 4 }}>
+        <h2>Convide seus alunos</h2>
+        <p className="muted">Mande o link (ou o código) para o aluno. Depois de criar a conta, ele entra na sua turma e passa a ver os seus cadernos.</p>
       </div>
-      <input className="inp mono" readOnly value={link} aria-label="Link de convite" onFocus={(e) => e.target.select()} />
-      <div className="row">
-        <button className="btn primary" type="button" onClick={copiar}>{copiado ? "Copiado!" : "Copiar link"}</button>
-        <button className="btn ghost" type="button" onClick={novo} disabled={ocupado}>Gerar outro código</button>
+      <div className="invite">
+        <div className="stack" style={{ gap: 8 }}>
+          <span className="label">Código da turma</span>
+          <div className="code-bubbles" aria-label={`Código ${codigo}`}>{codigo.split("").map((ch, i) => <span key={i}>{ch}</span>)}</div>
+        </div>
+        <div className="stack" style={{ gap: 8, minWidth: 0 }}>
+          <span className="label">Link de convite</span>
+          <input className="inp mono" readOnly value={link} aria-label="Link de convite" onFocus={(e) => e.target.select()} style={{ fontSize: "0.88rem" }} />
+          <div className="row">
+            <button className="btn primary" type="button" onClick={copiar}><Icone nome={copiado ? "certo" : "copiar"} tamanho={16} />{copiado ? "Copiado!" : "Copiar link"}</button>
+            <button className="btn ghost" type="button" onClick={novo} disabled={ocupado}><Icone nome="repetir" tamanho={16} />Gerar outro código</button>
+          </div>
+        </div>
       </div>
     </section>
   );
